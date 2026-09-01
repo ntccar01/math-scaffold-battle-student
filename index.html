@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>數學鷹架戰鬥｜1-1 和差角公式</title>
+  <link rel="stylesheet" href="./styles/game.css">
+</head>
+<body>
+  <a class="skip-link" href="#task-panel">跳到目前任務</a>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand-block">
+        <span class="chapter-mark">數學第三冊</span>
+        <div>
+          <p class="eyebrow">第一章・1-1 和差角公式</p>
+          <h1>青衍門｜拆式歷練</h1>
+        </div>
+      </div>
+      <div class="player-status" aria-label="角色狀態">
+        <div class="student-status-row">
+          <span>學員</span>
+          <strong id="student-identity">尚未選擇</strong>
+          <button id="student-profile-button" type="button">學習紀錄</button>
+        </div>
+        <div class="realm-status"><span>境界</span><strong>初識</strong></div>
+        <div><span>經驗</span><strong id="xp-text">0 / 90</strong></div>
+        <div class="xp-track" aria-hidden="true"><i id="xp-fill"></i></div>
+      </div>
+    </header>
+
+    <nav class="journey-nav" aria-label="歷練功能">
+      <button class="nav-button is-active" type="button" data-view="battle">下山歷練</button>
+      <button class="nav-button" type="button" data-roadmap="武學譜">武學譜</button>
+      <button class="nav-button" type="button" data-roadmap="行囊">行囊</button>
+      <button class="nav-button" type="button" data-roadmap="宗門商店">宗門商店</button>
+      <button class="sound-toggle" id="motion-toggle" type="button" aria-pressed="false">減少動畫：關</button>
+    </nav>
+
+    <main class="battle-layout">
+      <section class="battle-stage" aria-labelledby="stage-title">
+        <div class="stage-heading">
+          <div>
+            <p class="eyebrow" id="stage-kind">基礎歷練</p>
+            <h2 id="stage-title">第一關・拆角試煉</h2>
+          </div>
+          <div class="stage-count"><span id="question-count">1</span><small id="question-total">/ 9</small></div>
+        </div>
+
+        <div class="combat-field" id="combat-field">
+          <article class="fighter-card hero-card" id="hero-card">
+            <span class="fighter-rank">弟子</span>
+            <div class="character-frame hero-frame" aria-hidden="true">
+              <img class="character-sprite hero-sprite" src="./assets/characters/hero-swordsman-v1.webp" alt="">
+            </div>
+            <h3>見習算士</h3>
+            <div class="meter-label"><span>心法</span><span id="focus-value">100</span></div>
+            <div class="meter"><i id="focus-meter" style="width:100%"></i></div>
+          </article>
+
+          <div class="clash-zone" aria-live="polite">
+            <div class="strike-line" id="strike-line"></div>
+            <span class="slash-effect" aria-hidden="true"></span>
+            <span class="impact-burst" aria-hidden="true">斬</span>
+            <span class="round-seal" id="combat-callout">找出弱點</span>
+          </div>
+
+          <article class="fighter-card enemy-card" id="enemy-card">
+            <span class="fighter-rank" id="enemy-rank">木樁守衛</span>
+            <div class="character-frame enemy-frame" aria-hidden="true">
+              <img class="character-sprite enemy-sprite" src="./assets/characters/formula-wraith-v1.webp" alt="">
+              <span class="enemy-symbol" id="enemy-sigil">角</span>
+            </div>
+            <h3 id="enemy-name">錯角木人</h3>
+            <div class="meter-label"><span>護盾</span><span id="shield-value">100</span></div>
+            <div class="meter enemy-meter"><i id="shield-meter" style="width:100%"></i></div>
+          </article>
+        </div>
+
+        <div class="skill-row" aria-label="武學技能">
+          <div class="skill-slot" id="skill-structure"><span>一式</span><strong>拆招訣</strong><small>找出角度結構</small></div>
+          <div class="skill-slot" id="skill-formula"><span>二式</span><strong>定式訣</strong><small>選對公式</small></div>
+          <div class="skill-slot" id="skill-check"><span>心法</span><strong>驗算心法</strong><small>檢查正負與大小</small></div>
+        </div>
+      </section>
+
+      <section class="task-card" id="task-panel" aria-labelledby="task-title">
+        <div class="task-progress">
+          <span id="step-label">第 1 步，共 6 步</span>
+          <div class="step-track" aria-hidden="true"><i id="step-fill"></i></div>
+        </div>
+
+        <div class="source-card">
+          <div>
+            <span>課本自學指引</span>
+            <strong id="source-reference">第 4 頁｜餘弦函數的和差角公式</strong>
+          </div>
+          <button type="button" id="formula-reference-button">查看公式頁重點</button>
+        </div>
+
+        <div class="question-block">
+          <p class="mission-label" id="mission-label">任務一｜拆角</p>
+          <h2 id="task-title">請選出可直接使用特殊角函數值的拆法。</h2>
+          <div class="question-math" id="question-math"></div>
+          <div class="question-visual" id="question-visual" hidden></div>
+        </div>
+
+        <form id="answer-form">
+          <fieldset>
+            <legend class="sr-only">請選擇答案</legend>
+            <div class="answer-options" id="answer-options"></div>
+          </fieldset>
+          <div class="action-row">
+            <button class="hint-button" id="hint-button" type="button">取得提示 <span id="hint-level">0 / 5</span></button>
+            <button class="submit-button" type="submit">確認這一步</button>
+          </div>
+        </form>
+
+        <div class="feedback-panel" id="feedback-panel" role="status" aria-live="polite" hidden></div>
+
+        <section class="hint-panel" id="hint-panel" aria-live="polite" hidden>
+          <div class="hint-heading"><span>引導提示</span><strong id="hint-heading-level">第 1 層</strong></div>
+          <p id="hint-copy"></p>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="formula-dialog" class="formula-dialog">
+    <form method="dialog">
+      <div class="dialog-heading">
+        <div><p class="eyebrow">課本第 4～6 頁</p><h2>正弦、餘弦、正切函數的和差角公式</h2></div>
+        <button class="dialog-close" value="close" aria-label="關閉">×</button>
+      </div>
+      <p class="dialog-note">請先確認題目是正弦、餘弦或正切，再比對和角或差角。公式內容依課本順序呈現。</p>
+      <div class="formula-sheet" id="formula-sheet"></div>
+      <button class="dialog-primary" value="close">返回目前步驟</button>
+    </form>
+  </dialog>
+
+  <dialog id="roadmap-dialog" class="formula-dialog compact-dialog">
+    <form method="dialog">
+      <div class="dialog-heading"><h2 id="roadmap-title">後續功能</h2><button class="dialog-close" value="close" aria-label="關閉">×</button></div>
+      <p id="roadmap-copy"></p>
+      <button class="dialog-primary" value="close">繼續歷練</button>
+    </form>
+  </dialog>
+
+  <dialog id="victory-dialog" class="victory-dialog">
+    <div class="victory-seal" aria-hidden="true">破</div>
+    <p class="eyebrow">本題歷練完成</p>
+    <h2 id="victory-title">主要招式發動</h2>
+    <div class="victory-answer" id="victory-answer"></div>
+    <p id="victory-copy"></p>
+    <button class="dialog-primary" id="next-question-button" type="button">前往下一關</button>
+  </dialog>
+
+  <dialog id="profile-dialog" class="formula-dialog profile-dialog" aria-labelledby="profile-dialog-title">
+    <div class="dialog-heading">
+      <div>
+        <p class="eyebrow">本機學生檔案</p>
+        <h2 id="profile-dialog-title">選擇或建立學生資料</h2>
+      </div>
+      <button class="dialog-close" id="profile-dialog-close" type="button" aria-label="關閉" hidden>×</button>
+    </div>
+    <p class="dialog-note">資料只保存在目前瀏覽器。可使用暱稱，不需要填寫生日、電話或電子郵件。</p>
+
+    <section id="saved-profiles-section" class="saved-profiles" hidden>
+      <h3>繼續學習</h3>
+      <div id="profile-list" class="profile-list"></div>
+    </section>
+
+    <div class="profile-divider"><span>建立另一位學生</span></div>
+    <form id="create-profile-form" class="profile-form">
+      <label>
+        <span>班級</span>
+        <input id="profile-class" name="className" type="text" maxlength="20" autocomplete="organization" placeholder="例如：汽二甲" required>
+      </label>
+      <label>
+        <span>座號</span>
+        <input id="profile-seat" name="seatNo" type="text" maxlength="6" inputmode="numeric" placeholder="例如：12" required>
+      </label>
+      <label>
+        <span>顯示名稱</span>
+        <input id="profile-name" name="displayName" type="text" maxlength="20" autocomplete="name" placeholder="姓名或暱稱" required>
+      </label>
+      <p id="profile-form-feedback" class="profile-form-feedback" role="status" hidden></p>
+      <button class="dialog-primary" type="submit">建立並開始學習</button>
+    </form>
+  </dialog>
+
+  <dialog id="learning-dialog" class="formula-dialog learning-dialog" aria-labelledby="learning-dialog-title">
+    <div class="dialog-heading">
+      <div>
+        <p class="eyebrow">個人學習摘要</p>
+        <h2 id="learning-dialog-title">我的學習紀錄</h2>
+      </div>
+      <button class="dialog-close" id="learning-dialog-close" type="button" aria-label="關閉">×</button>
+    </div>
+    <div class="learning-identity">
+      <strong id="learning-student-name"></strong>
+      <span id="learning-student-meta"></span>
+    </div>
+    <p class="learning-current" id="learning-current-progress"></p>
+    <div class="learning-stats" aria-label="學習統計">
+      <div><strong id="learning-completed">0</strong><span>完成題數</span></div>
+      <div><strong id="learning-attempts">0</strong><span>作答次數</span></div>
+      <div><strong id="learning-wrong">0</strong><span>答錯次數</span></div>
+      <div><strong id="learning-hints">0</strong><span>提示次數</span></div>
+      <div><strong id="learning-time">0 分</strong><span>估計學習時間</span></div>
+    </div>
+    <section class="learning-errors">
+      <h3>需要留意的錯誤</h3>
+      <div id="learning-error-list"></div>
+    </section>
+    <p class="local-storage-note">此摘要只存在目前裝置與瀏覽器；清除瀏覽資料或使用無痕模式可能使紀錄消失。</p>
+    <div class="profile-actions">
+      <button id="switch-profile-button" type="button">切換學生</button>
+      <button id="delete-profile-button" class="danger-button" type="button">刪除我的紀錄</button>
+      <button id="learning-dialog-done" class="dialog-primary" type="button">繼續歷練</button>
+    </div>
+  </dialog>
+  <script src="./data/questions/third-book-1-1.bundle.js"></script>
+  <script src="./modules/answer-order.js"></script>
+  <script src="./modules/profile-store.js"></script>
+  <script src="./modules/app.js"></script>
+</body>
+</html>
