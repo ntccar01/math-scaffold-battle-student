@@ -38,6 +38,17 @@
       <button class="sound-toggle" id="motion-toggle" type="button" aria-pressed="false">減少動畫：關</button>
     </nav>
 
+    <section class="stage-selector" aria-labelledby="stage-selector-title">
+      <div class="stage-selector-heading">
+        <div>
+          <p class="eyebrow">關卡導覽</p>
+          <h2 id="stage-selector-title">選擇歷練關卡</h2>
+        </div>
+        <p id="stage-selector-copy">完成關卡後仍可回看，重新練習不重複計分。</p>
+      </div>
+      <div class="stage-list" id="stage-list" aria-label="1-1 和差角公式關卡"></div>
+    </section>
+
     <main class="battle-layout">
       <section class="battle-stage" aria-labelledby="stage-title">
         <div class="stage-heading">
@@ -91,6 +102,20 @@
           <div class="step-track" aria-hidden="true"><i id="step-fill"></i></div>
         </div>
 
+        <section class="study-mode-banner" id="study-mode-banner" aria-live="polite" hidden>
+          <div>
+            <strong id="study-mode-title">已通過・查看模式</strong>
+            <span id="study-mode-copy">此步驟只能查看，不會改變正式進度。</span>
+          </div>
+          <button id="replay-question-button" type="button">重新練習本關</button>
+        </section>
+
+        <nav class="step-navigation" id="step-navigation" aria-label="解題步驟導覽" hidden>
+          <button id="previous-step-button" type="button">上一項</button>
+          <button id="return-progress-button" type="button" hidden>回到目前進度</button>
+          <button id="next-step-button" type="button" hidden>下一項</button>
+        </nav>
+
         <div class="source-card">
           <div>
             <span>課本自學指引</span>
@@ -113,7 +138,7 @@
           </fieldset>
           <div class="action-row">
             <button class="hint-button" id="hint-button" type="button">取得提示 <span id="hint-level">0 / 5</span></button>
-            <button class="submit-button" type="submit">確認這一步</button>
+            <button class="submit-button" id="answer-submit-button" type="submit">確認這一步</button>
           </div>
         </form>
 
@@ -153,6 +178,7 @@
     <h2 id="victory-title">主要招式發動</h2>
     <div class="victory-answer" id="victory-answer"></div>
     <p id="victory-copy"></p>
+    <p class="victory-reward-note" id="victory-reward-note" hidden></p>
     <button class="dialog-primary" id="next-question-button" type="button">前往下一關</button>
   </dialog>
 
@@ -208,8 +234,10 @@
       <div><strong id="learning-attempts">0</strong><span>作答次數</span></div>
       <div><strong id="learning-wrong">0</strong><span>答錯次數</span></div>
       <div><strong id="learning-hints">0</strong><span>提示次數</span></div>
+      <div><strong id="learning-practice">0</strong><span>複習完成</span></div>
       <div><strong id="learning-time">0 分</strong><span>估計學習時間</span></div>
     </div>
+    <p class="practice-summary" id="learning-practice-detail">不計分複習尚無紀錄。</p>
     <section class="learning-errors">
       <h3>需要留意的錯誤</h3>
       <div id="learning-error-list"></div>
@@ -221,7 +249,7 @@
       <button id="learning-dialog-done" class="dialog-primary" type="button">繼續歷練</button>
     </div>
   </dialog>
-  <script src="./data/questions/third-book-1-1.bundle.js"></script>
+  <script src="./data/questions/third-book-1-1.bundle.js?v=065a91a245ea"></script>
   <script src="./modules/answer-order.js"></script>
   <script src="./modules/profile-store.js"></script>
   <script src="./modules/app.js"></script>

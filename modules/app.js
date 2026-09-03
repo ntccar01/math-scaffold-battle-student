@@ -50,6 +50,7 @@
     victoryTitle: $("#victory-title"),
     victoryAnswer: $("#victory-answer"),
     victoryCopy: $("#victory-copy"),
+    victoryRewardNote: $("#victory-reward-note"),
     nextQuestionButton: $("#next-question-button"),
     xpText: $("#xp-text"),
     xpFill: $("#xp-fill"),
@@ -72,10 +73,23 @@
     learningAttempts: $("#learning-attempts"),
     learningWrong: $("#learning-wrong"),
     learningHints: $("#learning-hints"),
+    learningPractice: $("#learning-practice"),
+    learningPracticeDetail: $("#learning-practice-detail"),
     learningTime: $("#learning-time"),
     learningErrorList: $("#learning-error-list"),
     switchProfileButton: $("#switch-profile-button"),
     deleteProfileButton: $("#delete-profile-button"),
+    stageSelectorCopy: $("#stage-selector-copy"),
+    stageList: $("#stage-list"),
+    studyModeBanner: $("#study-mode-banner"),
+    studyModeTitle: $("#study-mode-title"),
+    studyModeCopy: $("#study-mode-copy"),
+    replayQuestionButton: $("#replay-question-button"),
+    stepNavigation: $("#step-navigation"),
+    previousStepButton: $("#previous-step-button"),
+    returnProgressButton: $("#return-progress-button"),
+    nextStepButton: $("#next-step-button"),
+    answerSubmitButton: $("#answer-submit-button"),
     appShell: $(".app-shell")
   };
 
@@ -91,6 +105,7 @@
     eventLog: [],
     lastInteractionAt: null,
     lastInteractionQuestionId: null,
+    lastInteractionMode: null,
     answerPositionPlan: createBalancedPlan(totalSteps, 3),
     optionOrders: {},
     reducedMotion: window.matchMedia("(prefers-reduced-motion: reduce)").matches
@@ -127,6 +142,18 @@
       const completedCount = Math.min(totalQuestions, Math.floor(next.xp / xpPerQuestion));
       next.completedQuestionIds = data.questions.slice(0, completedCount).map((question) => question.id);
     }
+    const knownQuestionIds = new Set(data.questions.map((question) => question.id));
+    next.completedQuestionIds = [...new Set(next.completedQuestionIds.filter((questionId) => knownQuestionIds.has(questionId)))];
+    const firstUnfinishedQuestion = data.questions.findIndex((question) => !next.completedQuestionIds.includes(question.id));
+    if (firstUnfinishedQuestion === -1) {
+      next.questionIndex = totalQuestions - 1;
+      next.stepIndex = data.questions[totalQuestions - 1].steps.length - 1;
+      next.hintLevel = 0;
+    } else if (next.completedQuestionIds.includes(data.questions[next.questionIndex].id)) {
+      next.questionIndex = firstUnfinishedQuestion;
+      next.stepIndex = 0;
+      next.hintLevel = 0;
+    }
     return next;
   }
 
@@ -156,26 +183,92 @@
 
   let state = loadState();
 
+  function isQuestionCompleted(questionIndex) {
+    return state.completedQuestionIds.includes(data.questions[questionIndex].id);
+  }
+
+  function isUnitCompleted() {
+    return data.questions.every((question) => state.completedQuestionIds.includes(question.id));
+  }
+
+  function createProgressView() {
+    const completed = isUnitCompleted();
+    return {
+      mode: completed ? "review" : "progress",
+      questionIndex: state.questionIndex,
+      stepIndex: completed ? data.questions[state.questionIndex].steps.length - 1 : state.stepIndex,
+      hintLevel: 0,
+      focus: 100
+    };
+  }
+
+  let view = createProgressView();
+
+  function syncViewToProgress() {
+    view = createProgressView();
+  }
+
+  function isReviewMode() {
+    return view.mode === "review";
+  }
+
+  function isPracticeMode() {
+    return view.mode === "practice";
+  }
+
+  function currentHintLevel() {
+    if (isPracticeMode()) return view.hintLevel;
+    if (isReviewMode()) return 0;
+    return state.hintLevel;
+  }
+
+  function currentFocus() {
+    if (isPracticeMode()) return view.focus;
+    if (isReviewMode()) return 100;
+    return state.focus;
+  }
+
+  function reviewStepLimit(questionIndex) {
+    if (isQuestionCompleted(questionIndex) || questionIndex < state.questionIndex) {
+      return data.questions[questionIndex].steps.length - 1;
+    }
+    if (questionIndex === state.questionIndex) return state.stepIndex - 1;
+    return -1;
+  }
+
   function saveState() {
     if (!activeProfile) return;
     profileStore.saveUnitState(activeProfile.id, unitId, state);
   }
 
   function ensureQuestionSummary(questionId) {
-    if (!state.learningSummary[questionId]) {
-      state.learningSummary[questionId] = {
-        attempts: 0,
-        correctSteps: 0,
-        wrongAnswers: 0,
-        hintsUsed: 0,
-        maxHintLevel: 0,
-        activeMs: 0,
-        errorTags: {},
-        startedAt: new Date().toISOString(),
-        lastActiveAt: null,
-        completedAt: null
-      };
-    }
+    const saved = state.learningSummary[questionId] || {};
+    state.learningSummary[questionId] = {
+      attempts: 0,
+      correctSteps: 0,
+      wrongAnswers: 0,
+      hintsUsed: 0,
+      maxHintLevel: 0,
+      activeMs: 0,
+      errorTags: {},
+      startedAt: new Date().toISOString(),
+      lastActiveAt: null,
+      completedAt: null,
+      reviewVisits: 0,
+      practiceRuns: 0,
+      practiceCompletions: 0,
+      practiceAttempts: 0,
+      practiceCorrectSteps: 0,
+      practiceWrongAnswers: 0,
+      practiceHintsUsed: 0,
+      practiceMaxHintLevel: 0,
+      practiceActiveMs: 0,
+      practiceErrorTags: {},
+      lastPracticedAt: null,
+      ...saved,
+      errorTags: saved.errorTags && typeof saved.errorTags === "object" ? saved.errorTags : {},
+      practiceErrorTags: saved.practiceErrorTags && typeof saved.practiceErrorTags === "object" ? saved.practiceErrorTags : {}
+    };
     return state.learningSummary[questionId];
   }
 
@@ -183,15 +276,44 @@
     const now = new Date();
     const questionId = currentQuestion().id;
     const summary = ensureQuestionSummary(questionId);
-    if (state.lastInteractionAt && state.lastInteractionQuestionId === questionId) {
+    const mode = details.mode || view.mode;
+    const isPractice = mode === "practice";
+    const recordsTime = mode !== "review";
+    if (recordsTime && state.lastInteractionAt && state.lastInteractionQuestionId === questionId && state.lastInteractionMode === mode) {
       const elapsed = now.getTime() - new Date(state.lastInteractionAt).getTime();
-      if (Number.isFinite(elapsed) && elapsed > 0) summary.activeMs += Math.min(elapsed, 5 * 60 * 1000);
+      if (Number.isFinite(elapsed) && elapsed > 0) {
+        const timeKey = isPractice ? "practiceActiveMs" : "activeMs";
+        summary[timeKey] += Math.min(elapsed, 5 * 60 * 1000);
+      }
     }
     state.lastInteractionAt = now.toISOString();
     state.lastInteractionQuestionId = questionId;
-    summary.lastActiveAt = now.toISOString();
+    state.lastInteractionMode = mode;
+    if (recordsTime) summary.lastActiveAt = now.toISOString();
 
-    if (type === "answer") {
+    if (mode === "review") {
+      if (type === "open") summary.reviewVisits += 1;
+    } else if (isPractice) {
+      summary.lastPracticedAt = now.toISOString();
+      if (type === "start") {
+        summary.practiceRuns += 1;
+      } else if (type === "answer") {
+        summary.practiceAttempts += 1;
+        if (details.correct) {
+          summary.practiceCorrectSteps += 1;
+        } else {
+          summary.practiceWrongAnswers += 1;
+          if (details.errorTag) {
+            summary.practiceErrorTags[details.errorTag] = (summary.practiceErrorTags[details.errorTag] || 0) + 1;
+          }
+        }
+      } else if (type === "hint") {
+        summary.practiceHintsUsed += 1;
+        summary.practiceMaxHintLevel = Math.max(summary.practiceMaxHintLevel, Number(details.hintLevel) || 0);
+      } else if (type === "complete") {
+        summary.practiceCompletions += 1;
+      }
+    } else if (type === "answer") {
       summary.attempts += 1;
       if (details.correct) {
         summary.correctSteps += 1;
@@ -210,9 +332,10 @@
     }
 
     state.eventLog.push({
-      type,
+      type: mode === "progress" ? type : `${mode}_${type}`,
+      mode,
       questionId,
-      step: state.stepIndex + 1,
+      step: view.stepIndex + 1,
       correct: details.correct,
       errorTag: details.errorTag || undefined,
       hintLevel: details.hintLevel || undefined,
@@ -222,23 +345,23 @@
   }
 
   function currentQuestion() {
-    return data.questions[state.questionIndex];
+    return data.questions[view.questionIndex];
   }
 
   function currentStep() {
-    return currentQuestion().steps[state.stepIndex];
+    return currentQuestion().steps[view.stepIndex];
   }
 
   function globalStepIndex() {
-    let index = state.stepIndex;
-    for (let questionIndex = 0; questionIndex < state.questionIndex; questionIndex += 1) {
+    let index = view.stepIndex;
+    for (let questionIndex = 0; questionIndex < view.questionIndex; questionIndex += 1) {
       index += data.questions[questionIndex].steps.length;
     }
     return index;
   }
 
   function orderedOptions(question, step) {
-    const key = `${question.id}:${state.stepIndex}`;
+    const key = `${question.id}:${view.stepIndex}`;
     const savedOrder = state.optionOrders[key];
     if (Array.isArray(savedOrder) && savedOrder.length === step.options.length) {
       const restored = savedOrder.map((id) => step.options.find((option) => option.id === id));
@@ -251,34 +374,193 @@
     return arranged;
   }
 
-  function renderOption(item, index) {
-    return `<label class="answer-card">
-      <input type="radio" name="answer" value="${item.id}">
+  function renderOption(item, index, readOnly = false) {
+    const passedClass = readOnly && item.correct ? " is-passed-answer" : "";
+    const checked = readOnly && item.correct ? " checked" : "";
+    const disabled = readOnly ? " disabled" : "";
+    return `<label class="answer-card${passedClass}">
+      <input type="radio" name="answer" value="${item.id}"${checked}${disabled}>
       <span class="option-key">${String.fromCharCode(65 + index)}</span>
       <span class="option-content">${item.html}</span>
     </label>`;
+  }
+
+  function scrollTaskIntoView() {
+    $("#task-panel").scrollIntoView({ behavior: state.reducedMotion ? "auto" : "smooth", block: "start" });
+  }
+
+  function renderStageSelector() {
+    const unitCompleted = isUnitCompleted();
+    if (isPracticeMode()) {
+      els.stageSelectorCopy.textContent = "目前為不計分複習；完成或離開複習後可再選擇其他已解鎖關卡。";
+    } else if (isReviewMode()) {
+      els.stageSelectorCopy.textContent = "查看模式不會改變正式進度；已通過關卡可重新練習，但不重複計分。";
+    } else {
+      els.stageSelectorCopy.textContent = "可點回已通過關卡查看；目前關卡請由正式進度繼續。";
+    }
+
+    els.stageList.replaceChildren();
+    data.questions.forEach((question, questionIndex) => {
+      const completed = isQuestionCompleted(questionIndex);
+      const currentProgress = !unitCompleted && questionIndex === state.questionIndex;
+      const displayed = questionIndex === view.questionIndex;
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "stage-choice";
+      button.classList.toggle("is-completed", completed);
+      button.classList.toggle("is-progress", currentProgress);
+      button.classList.toggle("is-viewing", displayed);
+      button.classList.toggle("is-practicing", displayed && isPracticeMode());
+      button.disabled = isPracticeMode() || (!completed && !currentProgress);
+      if (displayed) button.setAttribute("aria-current", "step");
+
+      const number = document.createElement("span");
+      number.className = "stage-choice-number";
+      number.textContent = `第 ${questionIndex + 1} 題`;
+      const title = document.createElement("strong");
+      title.textContent = question.title;
+      const status = document.createElement("small");
+      if (displayed && isPracticeMode()) {
+        status.textContent = "不計分複習中";
+      } else if (completed) {
+        status.textContent = "✓ 已通過・可查看";
+      } else if (currentProgress) {
+        status.textContent = "進行中・繼續作答";
+      } else {
+        status.textContent = "尚未解鎖";
+      }
+      button.append(number, title, status);
+      button.addEventListener("click", () => {
+        if (completed) {
+          enterReview(questionIndex, 0, true);
+        } else if (currentProgress) {
+          returnToProgress();
+        }
+      });
+      els.stageList.append(button);
+    });
+  }
+
+  function renderStudyControls() {
+    const review = isReviewMode();
+    const practice = isPracticeMode();
+    const completedQuestion = isQuestionCompleted(view.questionIndex);
+    els.studyModeBanner.hidden = !review && !practice;
+    els.replayQuestionButton.hidden = !review || !completedQuestion;
+
+    if (review) {
+      els.studyModeTitle.textContent = completedQuestion ? "✓ 已通過・查看模式" : "✓ 已完成步驟・查看模式";
+      els.studyModeCopy.textContent = "選項已鎖定，只能查看；回看不會改變正式進度或學習紀錄。";
+    } else if (practice) {
+      els.studyModeTitle.textContent = "重新練習・不計分";
+      els.studyModeCopy.textContent = "可正常作答並觸發戰鬥動畫，但不增加經驗、金幣或正式成績。";
+    }
+
+    if (practice) {
+      els.stepNavigation.hidden = true;
+      return;
+    }
+
+    if (!review) {
+      const canReviewPrevious = view.stepIndex > 0;
+      els.stepNavigation.hidden = !canReviewPrevious;
+      els.previousStepButton.hidden = !canReviewPrevious;
+      els.previousStepButton.disabled = !canReviewPrevious;
+      els.returnProgressButton.hidden = true;
+      els.nextStepButton.hidden = true;
+      return;
+    }
+
+    const reviewLimit = reviewStepLimit(view.questionIndex);
+    els.stepNavigation.hidden = false;
+    els.previousStepButton.hidden = false;
+    els.previousStepButton.disabled = view.stepIndex <= 0;
+    els.returnProgressButton.hidden = false;
+    els.returnProgressButton.textContent = isUnitCompleted() ? "回到最後通關" : "回到目前進度";
+    els.nextStepButton.hidden = false;
+    els.nextStepButton.disabled = view.stepIndex >= reviewLimit;
+  }
+
+  function enterReview(questionIndex, stepIndex = 0, recordVisit = false) {
+    const limit = reviewStepLimit(questionIndex);
+    if (limit < 0) return;
+    view = {
+      mode: "review",
+      questionIndex,
+      stepIndex: Math.max(0, Math.min(limit, stepIndex)),
+      hintLevel: 0,
+      focus: 100
+    };
+    if (recordVisit) recordActivity("open", { mode: "review" });
+    render();
+    scrollTaskIntoView();
+  }
+
+  function returnToProgress() {
+    syncViewToProgress();
+    render();
+    scrollTaskIntoView();
+  }
+
+  function startPractice() {
+    if (!isQuestionCompleted(view.questionIndex)) return;
+    view = {
+      mode: "practice",
+      questionIndex: view.questionIndex,
+      stepIndex: 0,
+      hintLevel: 0,
+      focus: 100
+    };
+    recordActivity("start", { mode: "practice" });
+    render();
+    scrollTaskIntoView();
+  }
+
+  function goPreviousStep() {
+    if (isPracticeMode()) return;
+    if (isReviewMode()) {
+      if (view.stepIndex <= 0) return;
+      view.stepIndex -= 1;
+      render();
+      scrollTaskIntoView();
+      return;
+    }
+    if (view.stepIndex > 0) enterReview(view.questionIndex, view.stepIndex - 1, false);
+  }
+
+  function goNextReviewStep() {
+    if (!isReviewMode()) return;
+    const limit = reviewStepLimit(view.questionIndex);
+    if (view.stepIndex >= limit) return;
+    view.stepIndex += 1;
+    render();
+    scrollTaskIntoView();
   }
 
   function render() {
     const question = currentQuestion();
     const step = currentStep();
     const options = orderedOptions(question, step);
-    const completedSteps = state.stepIndex;
+    const review = isReviewMode();
+    const practice = isPracticeMode();
+    const hintLevel = currentHintLevel();
+    const focus = currentFocus();
+    const completedSteps = review ? view.stepIndex + 1 : view.stepIndex;
     const shield = Math.max(0, 100 - Math.round((completedSteps / question.steps.length) * 100));
 
     els.stageKind.textContent = question.kind;
     els.stageTitle.textContent = question.title;
-    els.questionCount.textContent = String(state.questionIndex + 1);
+    els.questionCount.textContent = String(view.questionIndex + 1);
     els.questionTotal.textContent = `/ ${totalQuestions}`;
     els.enemyRank.textContent = question.enemyRank;
     els.enemyName.textContent = question.enemyName;
     els.enemySigil.textContent = question.enemySigil;
     els.shieldValue.textContent = String(shield);
     els.shieldMeter.style.width = `${shield}%`;
-    els.focusValue.textContent = String(state.focus);
-    els.focusMeter.style.width = `${state.focus}%`;
-    els.stepLabel.textContent = `第 ${state.stepIndex + 1} 步，共 ${question.steps.length} 步`;
-    els.stepFill.style.width = `${((state.stepIndex + 1) / question.steps.length) * 100}%`;
+    els.focusValue.textContent = String(focus);
+    els.focusMeter.style.width = `${focus}%`;
+    els.stepLabel.textContent = `第 ${view.stepIndex + 1} 步，共 ${question.steps.length} 步`;
+    els.stepFill.style.width = `${((view.stepIndex + 1) / question.steps.length) * 100}%`;
     els.sourceReference.textContent = question.sourceReference;
     els.missionLabel.textContent = step.mission;
     els.taskTitle.textContent = step.title;
@@ -286,32 +568,42 @@
     const visualHtml = step.visualHtml || question.visualHtml || "";
     els.questionVisual.innerHTML = visualHtml;
     els.questionVisual.hidden = !visualHtml;
-    els.answerOptions.innerHTML = options.map(renderOption).join("");
+    els.answerOptions.innerHTML = options.map((item, index) => renderOption(item, index, review)).join("");
     els.xpText.textContent = `${state.xp} / ${maxXp}`;
     els.xpFill.style.width = `${Math.min(100, (state.xp / maxXp) * 100)}%`;
-    els.hintLevel.textContent = `${state.hintLevel} / 5`;
-    els.hintPanel.hidden = state.hintLevel === 0;
+    els.hintLevel.textContent = `${hintLevel} / 5`;
+    els.hintPanel.hidden = hintLevel === 0;
+    els.hintButton.disabled = review;
+    els.answerSubmitButton.disabled = review;
+    els.answerSubmitButton.textContent = review ? "已通過，無法作答" : "確認這一步";
+    els.answerForm.classList.toggle("is-read-only", review);
     els.feedbackPanel.hidden = true;
     els.feedbackPanel.className = "feedback-panel";
-    els.combatCallout.textContent = completedSteps === 0 ? "找出弱點" : `已破 ${completedSteps} 式`;
+    els.combatField.classList.remove("is-striking", "is-shield-break", "is-checking", "is-finisher", "is-enemy-striking");
+    els.combatCallout.textContent = review ? "已通過" : (completedSteps === 0 ? "找出弱點" : `已破 ${completedSteps} 式`);
     document.body.classList.toggle("reduce-motion", state.reducedMotion);
+    document.body.classList.toggle("is-review-mode", review);
+    document.body.classList.toggle("is-practice-mode", practice);
     els.motionToggle.textContent = `減少動畫：${state.reducedMotion ? "開" : "關"}`;
     els.motionToggle.setAttribute("aria-pressed", String(state.reducedMotion));
     updateStudentIdentity();
 
     document.querySelectorAll(".skill-slot").forEach((node) => node.classList.remove("is-lit"));
-    if (state.stepIndex >= 1) $("#skill-structure").classList.add("is-lit");
-    if (state.stepIndex >= 2) $("#skill-formula").classList.add("is-lit");
-    if (state.stepIndex >= question.steps.length - 1) $("#skill-check").classList.add("is-lit");
+    if (view.stepIndex >= 1) $("#skill-structure").classList.add("is-lit");
+    if (view.stepIndex >= 2) $("#skill-formula").classList.add("is-lit");
+    if (view.stepIndex >= question.steps.length - 1) $("#skill-check").classList.add("is-lit");
 
-    if (state.hintLevel > 0) renderHint();
+    renderStageSelector();
+    renderStudyControls();
+    if (hintLevel > 0) renderHint();
     saveState();
   }
 
   function renderHint() {
     const question = currentQuestion();
-    const index = Math.max(0, state.hintLevel - 1);
-    els.hintHeadingLevel.textContent = `第 ${state.hintLevel} 層`;
+    const hintLevel = currentHintLevel();
+    const index = Math.max(0, hintLevel - 1);
+    els.hintHeadingLevel.textContent = `第 ${hintLevel} 層`;
     els.hintCopy.textContent = question.hints[index];
     els.hintPanel.hidden = false;
   }
@@ -339,6 +631,7 @@
 
   function handleSubmit(event) {
     event.preventDefault();
+    if (isReviewMode()) return;
     const selected = new FormData(els.answerForm).get("answer");
     if (!selected) {
       showFeedback("neutral", "尚未選擇", "先選一個判斷，再確認這一步。");
@@ -347,18 +640,27 @@
 
     const step = currentStep();
     const answer = step.options.find((item) => item.id === selected);
+    const answeredMode = view.mode;
+    const answeredQuestionIndex = view.questionIndex;
+    const answeredStepIndex = view.stepIndex;
     if (!answer.correct) {
-      state.focus = Math.max(55, state.focus - 5);
+      if (isPracticeMode()) {
+        view.focus = Math.max(55, view.focus - 5);
+      } else {
+        state.focus = Math.max(55, state.focus - 5);
+      }
       recordActivity("answer", { correct: false, errorTag: answer.errorTag });
-      state.mistakes.push({
-        questionId: currentQuestion().id,
-        step: state.stepIndex + 1,
-        errorTag: answer.errorTag,
-        at: new Date().toISOString()
-      });
+      if (!isPracticeMode()) {
+        state.mistakes.push({
+          questionId: currentQuestion().id,
+          step: view.stepIndex + 1,
+          errorTag: answer.errorTag,
+          at: new Date().toISOString()
+        });
+      }
       saveState();
-      els.focusValue.textContent = String(state.focus);
-      els.focusMeter.style.width = `${state.focus}%`;
+      els.focusValue.textContent = String(currentFocus());
+      els.focusMeter.style.width = `${currentFocus()}%`;
       showFeedback("error", `需要修正｜${answer.errorTag}`, answer.feedback);
       animateEnemyCounterattack();
       return;
@@ -373,11 +675,17 @@
     animateCombat(step.skill);
 
     window.setTimeout(() => {
-      if (state.stepIndex < currentQuestion().steps.length - 1) {
-        state.stepIndex += 1;
-        state.hintLevel = 0;
+      if (view.mode !== answeredMode || view.questionIndex !== answeredQuestionIndex || view.stepIndex !== answeredStepIndex) return;
+      if (view.stepIndex < currentQuestion().steps.length - 1) {
+        view.stepIndex += 1;
+        if (isPracticeMode()) {
+          view.hintLevel = 0;
+        } else {
+          state.stepIndex = view.stepIndex;
+          state.hintLevel = 0;
+        }
         render();
-        $("#task-panel").scrollIntoView({ behavior: state.reducedMotion ? "auto" : "smooth", block: "start" });
+        scrollTaskIntoView();
       } else {
         completeQuestion();
       }
@@ -386,16 +694,28 @@
 
   function completeQuestion() {
     const question = currentQuestion();
-    recordActivity("complete");
-    state.xp = Math.max(state.xp, (state.questionIndex + 1) * xpPerQuestion);
-    state.focus = 100;
+    const practice = isPracticeMode();
+    recordActivity("complete", { mode: practice ? "practice" : "progress" });
+    if (!practice) {
+      state.xp = Math.max(state.xp, (view.questionIndex + 1) * xpPerQuestion);
+      state.focus = 100;
+    }
     saveState();
     els.xpText.textContent = `${state.xp} / ${maxXp}`;
     els.xpFill.style.width = `${Math.min(100, (state.xp / maxXp) * 100)}%`;
-    els.victoryTitle.textContent = state.questionIndex === totalQuestions - 1 ? `${data.unit}・全部類題完成` : "主要招式發動";
+    els.victoryTitle.textContent = practice
+      ? "不計分複習完成"
+      : (view.questionIndex === totalQuestions - 1 ? `${data.unit}・全部類題完成` : "主要招式發動");
     els.victoryAnswer.innerHTML = question.finalAnswer;
     els.victoryCopy.textContent = question.finalCopy;
-    els.nextQuestionButton.textContent = state.questionIndex === totalQuestions - 1 ? `重新練習 ${totalQuestions} 題` : "前往下一關";
+    els.victoryRewardNote.hidden = false;
+    els.victoryRewardNote.textContent = practice
+      ? "本次為重新練習：已保留複習紀錄，但不增加經驗、金幣或正式成績。"
+      : "首次通關獎勵已記錄；日後可由關卡導覽回看或進行不計分重練。";
+    els.nextQuestionButton.textContent = practice
+      ? "返回本關查看"
+      : (view.questionIndex === totalQuestions - 1 ? "查看已通過關卡" : "前往下一關");
+    els.victoryDialog.dataset.completionMode = practice ? "practice" : "progress";
     els.combatField.classList.remove("is-striking", "is-shield-break", "is-checking", "is-finisher", "is-enemy-striking");
     void els.combatField.offsetWidth;
     els.combatField.classList.add("is-finisher");
@@ -406,21 +726,19 @@
   }
 
   function goNext() {
+    const completionMode = els.victoryDialog.dataset.completionMode;
     els.victoryDialog.close();
+    if (completionMode === "practice") {
+      enterReview(view.questionIndex, currentQuestion().steps.length - 1, false);
+      return;
+    }
     if (state.questionIndex < data.questions.length - 1) {
       state.questionIndex += 1;
       state.stepIndex = 0;
       state.hintLevel = 0;
-    } else {
-      const retainedLearning = {
-        completedQuestionIds: state.completedQuestionIds,
-        learningSummary: state.learningSummary,
-        eventLog: state.eventLog,
-        mistakes: state.mistakes,
-        xp: state.xp
-      };
-      state = { ...emptyState(), ...retainedLearning, reducedMotion: state.reducedMotion };
     }
+    saveState();
+    syncViewToProgress();
     render();
     window.scrollTo({ top: 0, behavior: state.reducedMotion ? "auto" : "smooth" });
   }
@@ -513,6 +831,7 @@
     }
     activeProfile = selected;
     state = loadState();
+    syncViewToProgress();
     els.appShell.inert = false;
     if (els.profileDialog.open) els.profileDialog.close();
     if (els.learningDialog.open) els.learningDialog.close();
@@ -534,20 +853,40 @@
       result.wrong += Number(summary.wrongAnswers) || 0;
       result.hints += Number(summary.hintsUsed) || 0;
       result.activeMs += Number(summary.activeMs) || 0;
+      result.practiceCompletions += Number(summary.practiceCompletions) || 0;
+      result.practiceAttempts += Number(summary.practiceAttempts) || 0;
+      result.practiceWrong += Number(summary.practiceWrongAnswers) || 0;
+      result.practiceHints += Number(summary.practiceHintsUsed) || 0;
       Object.entries(summary.errorTags || {}).forEach(([tag, count]) => {
         result.errorTags[tag] = (result.errorTags[tag] || 0) + (Number(count) || 0);
       });
       return result;
-    }, { attempts: 0, wrong: 0, hints: 0, activeMs: 0, errorTags: {} });
+    }, {
+      attempts: 0,
+      wrong: 0,
+      hints: 0,
+      activeMs: 0,
+      practiceCompletions: 0,
+      practiceAttempts: 0,
+      practiceWrong: 0,
+      practiceHints: 0,
+      errorTags: {}
+    });
 
     els.learningStudentName.textContent = activeProfile.displayName;
     els.learningStudentMeta.textContent = `${activeProfile.className}・座號 ${activeProfile.seatNo}`;
-    els.learningCurrentProgress.textContent = `目前：${data.unit}・第 ${state.questionIndex + 1}/${totalQuestions} 題・第 ${state.stepIndex + 1} 步`;
+    els.learningCurrentProgress.textContent = isUnitCompleted()
+      ? `目前：${data.unit}・全部 ${totalQuestions} 題已完成，可回看或進行不計分重練`
+      : `目前：${data.unit}・第 ${state.questionIndex + 1}/${totalQuestions} 題・第 ${state.stepIndex + 1} 步`;
     els.learningCompleted.textContent = String(state.completedQuestionIds.length);
     els.learningAttempts.textContent = String(totals.attempts);
     els.learningWrong.textContent = String(totals.wrong);
     els.learningHints.textContent = String(totals.hints);
+    els.learningPractice.textContent = String(totals.practiceCompletions);
     els.learningTime.textContent = formatLearningTime(totals.activeMs);
+    els.learningPracticeDetail.textContent = totals.practiceAttempts
+      ? `不計分複習：作答 ${totals.practiceAttempts} 次、答錯 ${totals.practiceWrong} 次、使用提示 ${totals.practiceHints} 次；以上不列入正式成績。`
+      : "不計分複習尚無紀錄。";
 
     els.learningErrorList.replaceChildren();
     const errors = Object.entries(totals.errorTags).sort((a, b) => b[1] - a[1]);
@@ -589,17 +928,27 @@
 
   els.answerForm.addEventListener("submit", handleSubmit);
   els.hintButton.addEventListener("click", () => {
-    const nextHintLevel = Math.min(5, state.hintLevel + 1);
-    if (nextHintLevel > state.hintLevel) {
-      state.hintLevel = nextHintLevel;
-      recordActivity("hint", { hintLevel: state.hintLevel });
+    if (isReviewMode()) return;
+    const hintLevel = currentHintLevel();
+    const nextHintLevel = Math.min(5, hintLevel + 1);
+    if (nextHintLevel > hintLevel) {
+      if (isPracticeMode()) {
+        view.hintLevel = nextHintLevel;
+      } else {
+        state.hintLevel = nextHintLevel;
+      }
+      recordActivity("hint", { hintLevel: nextHintLevel });
     }
     renderHint();
-    els.hintLevel.textContent = `${state.hintLevel} / 5`;
+    els.hintLevel.textContent = `${currentHintLevel()} / 5`;
     saveState();
   });
   $("#formula-reference-button").addEventListener("click", () => els.formulaDialog.showModal());
   els.nextQuestionButton.addEventListener("click", goNext);
+  els.replayQuestionButton.addEventListener("click", startPractice);
+  els.previousStepButton.addEventListener("click", goPreviousStep);
+  els.returnProgressButton.addEventListener("click", returnToProgress);
+  els.nextStepButton.addEventListener("click", goNextReviewStep);
   els.motionToggle.addEventListener("click", () => {
     state.reducedMotion = !state.reducedMotion;
     render();
@@ -645,6 +994,7 @@
     if (!deleted) return;
     activeProfile = null;
     state = emptyState();
+    syncViewToProgress();
     els.learningDialog.close();
     updateStudentIdentity();
     render();
