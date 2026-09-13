@@ -33,6 +33,9 @@
     taskTitle: $("#task-title"),
     questionMath: $("#question-math"),
     questionVisual: $("#question-visual"),
+    solutionTrail: $("#solution-trail"),
+    solutionTrailCount: $("#solution-trail-count"),
+    solutionTrailList: $("#solution-trail-list"),
     answerOptions: $("#answer-options"),
     answerForm: $("#answer-form"),
     feedbackPanel: $("#feedback-panel"),
@@ -537,6 +540,44 @@
     scrollTaskIntoView();
   }
 
+  function renderSolutionTrail(question) {
+    const completedSteps = Math.max(0, view.stepIndex);
+    els.solutionTrail.hidden = completedSteps === 0;
+    els.solutionTrailCount.textContent = `${completedSteps} 步`;
+    els.solutionTrailList.replaceChildren();
+    if (completedSteps === 0) return;
+
+    question.steps.slice(0, completedSteps).forEach((step, index) => {
+      const correctOption = step.options.find((option) => option.correct);
+      const article = document.createElement("article");
+      article.className = "solution-trail-item";
+      article.dataset.step = String(index + 1);
+
+      const heading = document.createElement("div");
+      heading.className = "solution-trail-item-heading";
+      const stepNumber = document.createElement("span");
+      stepNumber.className = "solution-trail-step";
+      stepNumber.textContent = `第 ${index + 1} 步`;
+      const status = document.createElement("strong");
+      status.textContent = "✓ 已通過";
+      heading.append(stepNumber, status);
+
+      const title = document.createElement("p");
+      title.className = "solution-trail-item-title";
+      title.textContent = step.title;
+
+      const resultLabel = document.createElement("span");
+      resultLabel.className = "solution-trail-result-label";
+      resultLabel.textContent = "通過結果";
+      const result = document.createElement("div");
+      result.className = "solution-trail-answer";
+      result.innerHTML = correctOption?.html || "已完成此步驟。";
+
+      article.append(heading, title, resultLabel, result);
+      els.solutionTrailList.append(article);
+    });
+  }
+
   function render() {
     const question = currentQuestion();
     const step = currentStep();
@@ -568,6 +609,7 @@
     const visualHtml = step.visualHtml || question.visualHtml || "";
     els.questionVisual.innerHTML = visualHtml;
     els.questionVisual.hidden = !visualHtml;
+    renderSolutionTrail(question);
     els.answerOptions.innerHTML = options.map((item, index) => renderOption(item, index, review)).join("");
     els.xpText.textContent = `${state.xp} / ${maxXp}`;
     els.xpFill.style.width = `${Math.min(100, (state.xp / maxXp) * 100)}%`;

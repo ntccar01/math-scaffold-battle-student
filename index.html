@@ -131,6 +131,18 @@
           <div class="question-visual" id="question-visual" hidden></div>
         </div>
 
+        <section class="solution-trail" id="solution-trail" aria-labelledby="solution-trail-title" hidden>
+          <div class="solution-trail-heading">
+            <div>
+              <span>已完成解題歷程</span>
+              <h3 id="solution-trail-title">前面步驟的通過結果</h3>
+            </div>
+            <strong id="solution-trail-count">0 步</strong>
+          </div>
+          <p class="solution-trail-note">先前已通過的結果會保留在這裡，供目前步驟參考；尚未完成的步驟不會提前顯示答案。</p>
+          <div class="solution-trail-list" id="solution-trail-list"></div>
+        </section>
+
         <form id="answer-form">
           <fieldset>
             <legend class="sr-only">請選擇答案</legend>
@@ -249,7 +261,7 @@
       <button id="learning-dialog-done" class="dialog-primary" type="button">繼續歷練</button>
     </div>
   </dialog>
-  <script src="./data/questions/third-book-1-1.bundle.js?v=065a91a245ea"></script>
+  <script src="./data/questions/third-book-1-1.bundle.js?v=76e07693e2f9"></script>
   <script src="./modules/answer-order.js"></script>
   <script src="./modules/profile-store.js"></script>
   <script src="./modules/app.js"></script>

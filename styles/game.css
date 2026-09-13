@@ -31,6 +31,8 @@ button, input { font: inherit; }
 button { color: inherit; }
 button:focus-visible, input:focus-visible + * { outline: 3px solid var(--gold); outline-offset: 3px; }
 math { font-family: var(--math-font); font-size: 1.18em; }
+math mfrac { min-width: 1.2em; }
+math msqrt { padding-inline: .04em; }
 
 .skip-link {
   position: fixed;
@@ -265,6 +267,23 @@ h1 { margin-bottom: 0; font-family: "DFKai-SB", "BiauKai", serif; font-size: cla
 .question-visual { margin: .7rem 0 .25rem; }
 .question-visual[hidden] { display: none; }
 .math-visual { border: 1px solid var(--line); background: rgba(87, 200, 155, .045); padding: .65rem; color: var(--ink-dim); }
+.solution-trail { margin: 0 0 1.25rem; border: 1px solid rgba(87, 200, 155, .28); background: rgba(87, 200, 155, .045); padding: .85rem .9rem; }
+.solution-trail[hidden] { display: none; }
+.solution-trail-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: .8rem; }
+.solution-trail-heading > div { min-width: 0; }
+.solution-trail-heading span { display: block; color: var(--jade); font-size: .7rem; }
+.solution-trail-heading h3 { margin: .16rem 0 0; font-size: .95rem; }
+.solution-trail-heading > strong { flex: none; color: var(--gold); font-size: .76rem; }
+.solution-trail-note { margin: .55rem 0 .7rem; color: var(--ink-dim); font-size: .75rem; line-height: 1.5; }
+.solution-trail-list { display: grid; gap: .55rem; max-height: 420px; overflow: auto; padding-right: .15rem; }
+.solution-trail-item { border-left: 3px solid var(--jade); background: rgba(4, 8, 6, .2); padding: .62rem .7rem; }
+.solution-trail-item-heading { display: flex; justify-content: space-between; align-items: center; gap: .75rem; }
+.solution-trail-step { color: var(--gold); font-size: .72rem; }
+.solution-trail-item-heading strong { color: var(--jade); font-size: .72rem; }
+.solution-trail-item-title { margin: .28rem 0 .45rem; color: var(--ink-dim); font-size: .78rem; line-height: 1.45; }
+.solution-trail-result-label { display: block; margin-bottom: .22rem; color: var(--ink-dim); font-size: .66rem; }
+.solution-trail-answer { overflow-x: auto; color: var(--gold); line-height: 1.45; }
+.solution-trail-answer math { font-size: clamp(.9rem, 2.6vw, 1.08rem); }
 .triangle-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .7rem; }
 .triangle-grid:has(.triangle-card:only-child) { grid-template-columns: minmax(0, 260px); }
 .triangle-card { min-width: 0; text-align: center; color: var(--jade); }
@@ -291,7 +310,9 @@ fieldset { padding: 0; margin: 0; border: 0; }
 .answer-card input { position: absolute; opacity: 0; pointer-events: none; }
 .option-key { width: 30px; height: 30px; display: grid; place-items: center; border: 1px solid var(--line); color: var(--ink-dim); font-size: .75rem; }
 .option-content { min-width: 0; line-height: 1.45; }
-.option-content math { max-width: 100%; overflow-x: auto; overflow-y: hidden; }
+.option-content math { max-width: 100%; overflow-x: auto; overflow-y: hidden; font-size: clamp(1.18rem, 2.7vw, 1.55rem); }
+.option-content math mfrac { padding: .08em .12em; }
+.option-content math msqrt { padding-inline: .08em; }
 .action-row { display: grid; grid-template-columns: .9fr 1.1fr; gap: .7rem; margin-top: 1rem; }
 .hint-button, .submit-button, .dialog-primary { min-height: 48px; border: 1px solid var(--line); cursor: pointer; }
 .hint-button { background: transparent; color: var(--ink-dim); }
@@ -477,12 +498,14 @@ dialog::backdrop { background: rgba(4, 8, 6, .82); backdrop-filter: blur(5px); }
   .source-card { align-items: stretch; flex-direction: column; margin: 1rem 0 1.15rem; padding: .75rem .8rem; }
   .source-card button { width: 100%; }
   .question-block { min-height: 125px; }
+  .solution-trail { margin-bottom: 1rem; padding: .75rem; }
+  .solution-trail-list { max-height: 300px; }
   .triangle-grid { grid-template-columns: 1fr; }
   .triangle-card svg { max-height: 112px; }
   .answer-card { min-height: 58px; padding: .65rem; grid-template-columns: 32px minmax(0, 1fr); }
   .option-key { width: 28px; height: 28px; }
   .option-content { font-size: .9rem; }
-  .option-content math { font-size: 1.02em; }
+  .option-content math { font-size: clamp(1.1rem, 5vw, 1.35rem); }
   .action-row { grid-template-columns: 1fr; }
   .hint-button { order: 2; }
   .formula-dialog, .victory-dialog { width: calc(100% - .8rem); max-height: calc(100vh - .8rem); padding: 1rem; }
