@@ -16,6 +16,7 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html { scroll-behavior: smooth; }
 body {
   margin: 0;
@@ -43,7 +44,7 @@ math msqrt { padding-inline: .04em; }
   background: var(--gold);
   color: #19140a;
 }
-.skip-link:focus { top: 1rem; }
+.skip-link:focus-visible { top: 1rem; }
 .sr-only {
   position: absolute;
   width: 1px;
@@ -80,6 +81,19 @@ math msqrt { padding-inline: .04em; }
   transform: rotate(-3deg);
 }
 .eyebrow { margin: 0 0 .28rem; color: var(--jade); font-size: .78rem; letter-spacing: .13em; text-transform: uppercase; }
+.unit-switch { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; width: 100%; padding-top: .7rem; }
+.unit-switch a { display: inline-block; padding: .4rem .7rem; border: 1px solid var(--line); color: var(--ink-dim); text-decoration: none; font-size: .82rem; }
+.unit-switch a:hover, .unit-switch a:focus-visible, .unit-switch a[aria-current="page"] { border-color: var(--jade); color: var(--jade); }
+.teacher-preview-banner { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin: .8rem 0; padding: .75rem .9rem; border: 1px solid var(--gold); background: rgba(220, 181, 102, .12); }
+.teacher-preview-banner div { display: grid; gap: .2rem; }
+.teacher-preview-banner strong { color: var(--gold); }
+.teacher-preview-banner span { color: var(--ink-dim); font-size: .78rem; line-height: 1.5; }
+.teacher-preview-banner a { flex: none; color: var(--gold); }
+.teacher-step-nav { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; margin-top: .75rem; }
+.teacher-step-nav label { color: var(--gold); }
+.teacher-step-nav select, .teacher-step-nav button { min-height: 42px; padding: .4rem .65rem; border: 1px solid var(--line); background: var(--panel); color: var(--ink); }
+.teacher-step-nav select { max-width: min(100%, 28rem); }
+.teacher-step-nav button { cursor: pointer; }
 h1, h2, h3, p { margin-top: 0; }
 h1 { margin-bottom: 0; font-family: "DFKai-SB", "BiauKai", serif; font-size: clamp(1.35rem, 2.4vw, 2rem); font-weight: 500; letter-spacing: .08em; }
 .player-status { display: grid; grid-template-columns: auto auto; min-width: 260px; gap: .25rem 1.6rem; }
@@ -492,6 +506,7 @@ dialog::backdrop { background: rgba(4, 8, 6, .82); backdrop-filter: blur(5px); }
   .skill-slot small { display: none; }
   .task-card { padding: 1rem; }
   .study-mode-banner { align-items: stretch; flex-direction: column; gap: .65rem; }
+  .teacher-preview-banner { align-items: flex-start; flex-direction: column; }
   .study-mode-banner button { width: 100%; }
   .step-navigation { grid-template-columns: 1fr 1fr; }
   #return-progress-button { grid-column: 1 / -1; grid-row: 1; }

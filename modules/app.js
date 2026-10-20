@@ -4,8 +4,21 @@
   const data = window.MathGameData;
   const { createBalancedPlan, arrangeOptions } = window.AnswerOrder;
   const profileStore = window.StudentProfileStore;
-  const legacyStorageKey = "math-scaffold-battle-1-1-v2";
-  const unitId = "M3-1-1";
+  const legacyStorageKey = data.legacyStorageKey || "math-scaffold-battle-1-1-v2";
+  const unitId = data.unitId || "M3-1-1";
+  const contentVersion = data.contentVersion || 1;
+  const searchParams = new URLSearchParams(location.search);
+  const localOrigin = location.protocol === "file:" || (location.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname));
+  const teacherPreview = localOrigin && searchParams.get("teacher-preview") === "1";
+  document.querySelectorAll(".unit-switch a").forEach((link) => {
+    if (new URL(link.href).searchParams.get("unit") === (new URLSearchParams(location.search).get("unit") || "1-1")) link.setAttribute("aria-current", "page");
+  });
+  document.title = `數學鷹架戰鬥｜${data.unit}`;
+  if (unitId === "M3-2-1") {
+    document.querySelector("#formula-source-title").textContent = "課本第 53～57 頁";
+    document.querySelector("#formula-dialog-title").textContent = "指數律、零指數、負指數與分數指數";
+    document.querySelector("#formula-dialog-note").textContent = "先辨識底數與指數，再對照課本的相乘、乘方、零次、負次方與分數指數規則。第 56 頁分數指數定義以 a＞0、n 為正整數、m 為整數為前提。";
+  }
   const totalSteps = data.questions.reduce((sum, question) => sum + question.steps.length, 0);
   const totalQuestions = data.questions.length;
   const xpPerQuestion = 10;
@@ -31,9 +44,12 @@
     sourceReference: $("#source-reference"),
     missionLabel: $("#mission-label"),
     taskTitle: $("#task-title"),
+    unitEyebrow: $("#unit-eyebrow"),
     questionMath: $("#question-math"),
     questionVisual: $("#question-visual"),
     solutionTrail: $("#solution-trail"),
+    solutionTrailTitle: $("#solution-trail-title"),
+    solutionTrailNote: $("#solution-trail-note"),
     solutionTrailCount: $("#solution-trail-count"),
     solutionTrailList: $("#solution-trail-list"),
     answerOptions: $("#answer-options"),
@@ -60,6 +76,11 @@
     motionToggle: $("#motion-toggle"),
     studentIdentity: $("#student-identity"),
     studentProfileButton: $("#student-profile-button"),
+    teacherPreviewBanner: $("#teacher-preview-banner"),
+    teacherPreviewExit: $("#teacher-preview-exit"),
+    teacherStepNav: $("#teacher-step-nav"),
+    teacherStepSelect: $("#teacher-step-select"),
+    teacherStepRestart: $("#teacher-step-restart"),
     profileDialog: $("#profile-dialog"),
     profileDialogClose: $("#profile-dialog-close"),
     savedProfilesSection: $("#saved-profiles-section"),
@@ -97,6 +118,7 @@
   };
 
   const emptyState = () => ({
+    contentVersion,
     questionIndex: 0,
     stepIndex: 0,
     xp: 0,
@@ -126,6 +148,12 @@
 
   function normalizeState(saved) {
     const next = { ...emptyState(), ...saved };
+    if (unitId === "M3-2-1" && (Number(saved?.contentVersion) || 1) < 2
+      && (next.questionIndex === 0 || next.questionIndex === 1)) {
+      // 舊版兩題的第 1 步已併入課本指引；原第 2、3 步仍使用原 ID。
+      next.stepIndex = Math.max(0, (Number(next.stepIndex) || 0) - 1);
+    }
+    next.contentVersion = contentVersion;
     const resetAnswerOrder = !isValidPositionPlan(next.answerPositionPlan);
     if (resetAnswerOrder) {
       next.answerPositionPlan = createBalancedPlan(totalSteps, 3);
@@ -160,9 +188,10 @@
     return next;
   }
 
-  let activeProfile = profileStore.getActiveProfile();
+  let activeProfile = teacherPreview ? null : profileStore.getActiveProfile();
 
   function loadState() {
+    if (teacherPreview) return emptyState();
     if (new URLSearchParams(location.search).has("reset")) {
       if (activeProfile) profileStore.clearUnitState(activeProfile.id, unitId);
       localStorage.removeItem(legacyStorageKey);
@@ -195,6 +224,7 @@
   }
 
   function createProgressView() {
+    if (teacherPreview) return { mode: "teacher", questionIndex: 0, stepIndex: 0, hintLevel: 0, focus: 100 };
     const completed = isUnitCompleted();
     return {
       mode: completed ? "review" : "progress",
@@ -220,13 +250,13 @@
   }
 
   function currentHintLevel() {
-    if (isPracticeMode()) return view.hintLevel;
+    if (isPracticeMode() || teacherPreview) return view.hintLevel;
     if (isReviewMode()) return 0;
     return state.hintLevel;
   }
 
   function currentFocus() {
-    if (isPracticeMode()) return view.focus;
+    if (isPracticeMode() || teacherPreview) return view.focus;
     if (isReviewMode()) return 100;
     return state.focus;
   }
@@ -240,7 +270,7 @@
   }
 
   function saveState() {
-    if (!activeProfile) return;
+    if (teacherPreview || !activeProfile) return;
     profileStore.saveUnitState(activeProfile.id, unitId, state);
   }
 
@@ -276,6 +306,7 @@
   }
 
   function recordActivity(type, details = {}) {
+    if (teacherPreview) return;
     const now = new Date();
     const questionId = currentQuestion().id;
     const summary = ensureQuestionSummary(questionId);
@@ -336,6 +367,7 @@
 
     state.eventLog.push({
       type: mode === "progress" ? type : `${mode}_${type}`,
+      contentVersion,
       mode,
       questionId,
       step: view.stepIndex + 1,
@@ -394,7 +426,9 @@
 
   function renderStageSelector() {
     const unitCompleted = isUnitCompleted();
-    if (isPracticeMode()) {
+    if (teacherPreview) {
+      els.stageSelectorCopy.textContent = "教師預覽可直接測試本單元任一關；不會解鎖或修改學生進度。";
+    } else if (isPracticeMode()) {
       els.stageSelectorCopy.textContent = "目前為不計分複習；完成或離開複習後可再選擇其他已解鎖關卡。";
     } else if (isReviewMode()) {
       els.stageSelectorCopy.textContent = "查看模式不會改變正式進度；已通過關卡可重新練習，但不重複計分。";
@@ -414,7 +448,7 @@
       button.classList.toggle("is-progress", currentProgress);
       button.classList.toggle("is-viewing", displayed);
       button.classList.toggle("is-practicing", displayed && isPracticeMode());
-      button.disabled = isPracticeMode() || (!completed && !currentProgress);
+      button.disabled = !teacherPreview && (isPracticeMode() || (!completed && !currentProgress));
       if (displayed) button.setAttribute("aria-current", "step");
 
       const number = document.createElement("span");
@@ -423,7 +457,9 @@
       const title = document.createElement("strong");
       title.textContent = question.title;
       const status = document.createElement("small");
-      if (displayed && isPracticeMode()) {
+      if (teacherPreview) {
+        status.textContent = displayed ? "教師預覽中" : "可直接測試";
+      } else if (displayed && isPracticeMode()) {
         status.textContent = "不計分複習中";
       } else if (completed) {
         status.textContent = "✓ 已通過・可查看";
@@ -434,7 +470,9 @@
       }
       button.append(number, title, status);
       button.addEventListener("click", () => {
-        if (completed) {
+        if (teacherPreview) {
+          jumpTeacherStep(questionIndex, 0);
+        } else if (completed) {
           enterReview(questionIndex, 0, true);
         } else if (currentProgress) {
           returnToProgress();
@@ -444,7 +482,30 @@
     });
   }
 
+  function jumpTeacherStep(questionIndex, stepIndex) {
+    if (!teacherPreview) return;
+    const question = data.questions[questionIndex];
+    if (!question || !Number.isInteger(stepIndex) || stepIndex < 0 || stepIndex >= question.steps.length) return;
+    view = { mode: "teacher", questionIndex, stepIndex, hintLevel: 0, focus: 100 };
+    render();
+    scrollTaskIntoView();
+  }
+
   function renderStudyControls() {
+    els.teacherStepNav.hidden = !teacherPreview;
+    if (teacherPreview) {
+      els.studyModeBanner.hidden = true;
+      els.stepNavigation.hidden = true;
+      els.teacherStepSelect.replaceChildren();
+      currentQuestion().steps.forEach((step, index) => {
+        const option = document.createElement("option");
+        option.value = String(index);
+        option.textContent = `第 ${index + 1} 步｜${step.mission || step.title}`;
+        els.teacherStepSelect.append(option);
+      });
+      els.teacherStepSelect.value = String(view.stepIndex);
+      return;
+    }
     const review = isReviewMode();
     const practice = isPracticeMode();
     const completedQuestion = isQuestionCompleted(view.questionIndex);
@@ -543,6 +604,10 @@
   function renderSolutionTrail(question) {
     const completedSteps = Math.max(0, view.stepIndex);
     els.solutionTrail.hidden = completedSteps === 0;
+    els.solutionTrailTitle.textContent = teacherPreview ? "前置步驟參考（教師預覽）" : "前面步驟的通過結果";
+    els.solutionTrailNote.textContent = teacherPreview
+      ? "為方便跳步測試，以下顯示前置步驟的正確結果；學生正式作答時須先通過才會顯示。"
+      : "先前已通過的結果會保留在這裡，供目前步驟參考；尚未完成的步驟不會提前顯示答案。";
     els.solutionTrailCount.textContent = `${completedSteps} 步`;
     els.solutionTrailList.replaceChildren();
     if (completedSteps === 0) return;
@@ -559,7 +624,7 @@
       stepNumber.className = "solution-trail-step";
       stepNumber.textContent = `第 ${index + 1} 步`;
       const status = document.createElement("strong");
-      status.textContent = "✓ 已通過";
+      status.textContent = teacherPreview ? "教師參考" : "✓ 已通過";
       heading.append(stepNumber, status);
 
       const title = document.createElement("p");
@@ -568,7 +633,7 @@
 
       const resultLabel = document.createElement("span");
       resultLabel.className = "solution-trail-result-label";
-      resultLabel.textContent = "通過結果";
+      resultLabel.textContent = teacherPreview ? "參考結果" : "通過結果";
       const result = document.createElement("div");
       result.className = "solution-trail-answer";
       result.innerHTML = correctOption?.html || "已完成此步驟。";
@@ -590,6 +655,7 @@
     const shield = Math.max(0, 100 - Math.round((completedSteps / question.steps.length) * 100));
 
     els.stageKind.textContent = question.kind;
+    if (els.unitEyebrow && data.unitLabel) els.unitEyebrow.textContent = data.unitLabel;
     els.stageTitle.textContent = question.title;
     els.questionCount.textContent = String(view.questionIndex + 1);
     els.questionTotal.textContent = `/ ${totalQuestions}`;
@@ -611,7 +677,8 @@
     els.questionVisual.hidden = !visualHtml;
     renderSolutionTrail(question);
     els.answerOptions.innerHTML = options.map((item, index) => renderOption(item, index, review)).join("");
-    els.xpText.textContent = `${state.xp} / ${maxXp}`;
+    if (window.CoordinatePlot) window.CoordinatePlot.mount(els.questionVisual, step, options, review, data.questions, state.completedQuestionIds);
+    els.xpText.textContent = teacherPreview ? "預覽不計分" : `${state.xp} / ${maxXp}`;
     els.xpFill.style.width = `${Math.min(100, (state.xp / maxXp) * 100)}%`;
     els.hintLevel.textContent = `${hintLevel} / 5`;
     els.hintPanel.hidden = hintLevel === 0;
@@ -628,6 +695,8 @@
     document.body.classList.toggle("is-practice-mode", practice);
     els.motionToggle.textContent = `減少動畫：${state.reducedMotion ? "開" : "關"}`;
     els.motionToggle.setAttribute("aria-pressed", String(state.reducedMotion));
+    els.teacherPreviewBanner.hidden = !teacherPreview;
+    els.studentProfileButton.hidden = teacherPreview;
     updateStudentIdentity();
 
     document.querySelectorAll(".skill-slot").forEach((node) => node.classList.remove("is-lit"));
@@ -646,7 +715,7 @@
     const hintLevel = currentHintLevel();
     const index = Math.max(0, hintLevel - 1);
     els.hintHeadingLevel.textContent = `第 ${hintLevel} 層`;
-    els.hintCopy.textContent = question.hints[index];
+    els.hintCopy.textContent = (currentStep().hints || question.hints)[index];
     els.hintPanel.hidden = false;
   }
 
@@ -686,14 +755,15 @@
     const answeredQuestionIndex = view.questionIndex;
     const answeredStepIndex = view.stepIndex;
     if (!answer.correct) {
-      if (isPracticeMode()) {
+      if (isPracticeMode() || teacherPreview) {
         view.focus = Math.max(55, view.focus - 5);
       } else {
         state.focus = Math.max(55, state.focus - 5);
       }
       recordActivity("answer", { correct: false, errorTag: answer.errorTag });
-      if (!isPracticeMode()) {
+      if (!isPracticeMode() && !teacherPreview) {
         state.mistakes.push({
+          contentVersion,
           questionId: currentQuestion().id,
           step: view.stepIndex + 1,
           errorTag: answer.errorTag,
@@ -720,7 +790,7 @@
       if (view.mode !== answeredMode || view.questionIndex !== answeredQuestionIndex || view.stepIndex !== answeredStepIndex) return;
       if (view.stepIndex < currentQuestion().steps.length - 1) {
         view.stepIndex += 1;
-        if (isPracticeMode()) {
+        if (isPracticeMode() || teacherPreview) {
           view.hintLevel = 0;
         } else {
           state.stepIndex = view.stepIndex;
@@ -737,6 +807,18 @@
   function completeQuestion() {
     const question = currentQuestion();
     const practice = isPracticeMode();
+    if (teacherPreview) {
+      els.victoryTitle.textContent = "教師預覽完成";
+      els.victoryAnswer.innerHTML = question.finalAnswer;
+      els.victoryCopy.textContent = question.finalCopy;
+      els.victoryRewardNote.hidden = false;
+      els.victoryRewardNote.textContent = "本次僅供教師測試，沒有儲存紀錄或發放獎勵。";
+      els.nextQuestionButton.textContent = view.questionIndex === totalQuestions - 1 ? "回到本關預覽" : "測試下一關";
+      els.victoryDialog.dataset.completionMode = "teacher";
+      els.combatCallout.textContent = "預覽完成";
+      window.setTimeout(() => els.victoryDialog.showModal(), state.reducedMotion ? 120 : 760);
+      return;
+    }
     recordActivity("complete", { mode: practice ? "practice" : "progress" });
     if (!practice) {
       state.xp = Math.max(state.xp, (view.questionIndex + 1) * xpPerQuestion);
@@ -770,6 +852,10 @@
   function goNext() {
     const completionMode = els.victoryDialog.dataset.completionMode;
     els.victoryDialog.close();
+    if (completionMode === "teacher") {
+      jumpTeacherStep(Math.min(totalQuestions - 1, view.questionIndex + 1), 0);
+      return;
+    }
     if (completionMode === "practice") {
       enterReview(view.questionIndex, currentQuestion().steps.length - 1, false);
       return;
@@ -817,7 +903,7 @@
   };
 
   function updateStudentIdentity() {
-    els.studentIdentity.textContent = activeProfile
+    els.studentIdentity.textContent = teacherPreview ? "教師預覽" : activeProfile
       ? `${activeProfile.className}・${activeProfile.seatNo}號・${activeProfile.displayName}`
       : "尚未選擇";
   }
@@ -956,6 +1042,7 @@
   }
 
   function initializeStudentProfiles() {
+    if (teacherPreview) return;
     if (!profileStore.isStorageAvailable()) {
       openProfileDialog();
       showProfileFeedback("目前瀏覽器不允許本機儲存，無法建立可續玩的學生紀錄。");
@@ -974,7 +1061,7 @@
     const hintLevel = currentHintLevel();
     const nextHintLevel = Math.min(5, hintLevel + 1);
     if (nextHintLevel > hintLevel) {
-      if (isPracticeMode()) {
+      if (isPracticeMode() || teacherPreview) {
         view.hintLevel = nextHintLevel;
       } else {
         state.hintLevel = nextHintLevel;
@@ -991,6 +1078,8 @@
   els.previousStepButton.addEventListener("click", goPreviousStep);
   els.returnProgressButton.addEventListener("click", returnToProgress);
   els.nextStepButton.addEventListener("click", goNextReviewStep);
+  els.teacherStepSelect.addEventListener("change", () => jumpTeacherStep(view.questionIndex, Number(els.teacherStepSelect.value)));
+  els.teacherStepRestart.addEventListener("click", () => jumpTeacherStep(view.questionIndex, 0));
   els.motionToggle.addEventListener("click", () => {
     state.reducedMotion = !state.reducedMotion;
     render();
@@ -999,6 +1088,16 @@
     button.addEventListener("click", () => showRoadmap(button.dataset.roadmap));
   });
   els.studentProfileButton.addEventListener("click", openLearningDialog);
+  if (teacherPreview) {
+    const exitUrl = new URL(location.href);
+    exitUrl.searchParams.delete("teacher-preview");
+    els.teacherPreviewExit.href = exitUrl.href;
+    document.querySelectorAll(".unit-switch a").forEach((link) => {
+      const unitUrl = new URL(link.href);
+      unitUrl.searchParams.set("teacher-preview", "1");
+      link.href = unitUrl.href;
+    });
+  }
   els.createProfileForm.addEventListener("submit", (event) => {
     event.preventDefault();
     const formData = new FormData(els.createProfileForm);

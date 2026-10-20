@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark">
-  <title>數學鷹架戰鬥｜1-1 和差角公式</title>
+  <title>數學鷹架戰鬥｜數學第三冊</title>
   <link rel="stylesheet" href="./styles/game.css">
 </head>
 <body>
@@ -14,7 +14,7 @@
       <div class="brand-block">
         <span class="chapter-mark">數學第三冊</span>
         <div>
-          <p class="eyebrow">第一章・1-1 和差角公式</p>
+        <p class="eyebrow" id="unit-eyebrow">第一章・1-1 和差角公式</p>
           <h1>青衍門｜拆式歷練</h1>
         </div>
       </div>
@@ -30,6 +30,14 @@
       </div>
     </header>
 
+    <div class="unit-switch" aria-label="切換單元">
+      <a href="?unit=1-1">1-1 和差角公式</a>
+      <a href="?unit=2-1">2-1 指數</a>
+    </div>
+    <section class="teacher-preview-banner" id="teacher-preview-banner" hidden>
+      <div><strong>教師預覽｜本機測試</strong><span>可自由選關、跳步與試答；不讀寫學生紀錄、不計分。這不是線上教師帳號或存取權限。</span></div>
+      <a id="teacher-preview-exit" href="?unit=1-1">退出預覽</a>
+    </section>
     <nav class="journey-nav" aria-label="歷練功能">
       <button class="nav-button is-active" type="button" data-view="battle">下山歷練</button>
       <button class="nav-button" type="button" data-roadmap="武學譜">武學譜</button>
@@ -46,7 +54,7 @@
         </div>
         <p id="stage-selector-copy">完成關卡後仍可回看，重新練習不重複計分。</p>
       </div>
-      <div class="stage-list" id="stage-list" aria-label="1-1 和差角公式關卡"></div>
+      <div class="stage-list" id="stage-list" aria-label="本單元關卡"></div>
     </section>
 
     <main class="battle-layout">
@@ -109,6 +117,11 @@
           </div>
           <button id="replay-question-button" type="button">重新練習本關</button>
         </section>
+        <div class="teacher-step-nav" id="teacher-step-nav" hidden>
+          <label for="teacher-step-select">測試步驟</label>
+          <select id="teacher-step-select"></select>
+          <button id="teacher-step-restart" type="button">從第一步重試</button>
+        </div>
 
         <nav class="step-navigation" id="step-navigation" aria-label="解題步驟導覽" hidden>
           <button id="previous-step-button" type="button">上一項</button>
@@ -139,7 +152,7 @@
             </div>
             <strong id="solution-trail-count">0 步</strong>
           </div>
-          <p class="solution-trail-note">先前已通過的結果會保留在這裡，供目前步驟參考；尚未完成的步驟不會提前顯示答案。</p>
+          <p class="solution-trail-note" id="solution-trail-note">先前已通過的結果會保留在這裡，供目前步驟參考；尚未完成的步驟不會提前顯示答案。</p>
           <div class="solution-trail-list" id="solution-trail-list"></div>
         </section>
 
@@ -167,10 +180,10 @@
   <dialog id="formula-dialog" class="formula-dialog">
     <form method="dialog">
       <div class="dialog-heading">
-        <div><p class="eyebrow">課本第 4～6 頁</p><h2>正弦、餘弦、正切函數的和差角公式</h2></div>
+        <div><p class="eyebrow" id="formula-source-title">課本第 4～6 頁</p><h2 id="formula-dialog-title">正弦、餘弦、正切函數的和差角公式</h2></div>
         <button class="dialog-close" value="close" aria-label="關閉">×</button>
       </div>
-      <p class="dialog-note">請先確認題目是正弦、餘弦或正切，再比對和角或差角。公式內容依課本順序呈現。</p>
+      <p class="dialog-note" id="formula-dialog-note">請先確認題目是正弦、餘弦或正切，再比對和角或差角。公式內容依課本順序呈現。</p>
       <div class="formula-sheet" id="formula-sheet"></div>
       <button class="dialog-primary" value="close">返回目前步驟</button>
     </form>
@@ -262,6 +275,7 @@
     </div>
   </dialog>
   <script src="./data/questions/third-book-1-1.bundle.js?v=76e07693e2f9"></script>
+  <script src="./data/questions/third-book-2-1.js?v=c2cf502e84db"></script>
   <script src="./modules/answer-order.js"></script>
   <script src="./modules/profile-store.js"></script>
   <script src="./modules/app.js"></script>
