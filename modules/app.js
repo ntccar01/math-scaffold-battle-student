@@ -14,10 +14,30 @@
     if (new URL(link.href).searchParams.get("unit") === (new URLSearchParams(location.search).get("unit") || "1-1")) link.setAttribute("aria-current", "page");
   });
   document.title = `數學鷹架戰鬥｜${data.unit}`;
+  if (unitId === "M3-3-1") {
+    document.querySelector("#formula-source-title").textContent = "課本 3-1 空間概念";
+    document.querySelector("#formula-dialog-title").textContent = "空間概念與兩點距離公式";
+    document.querySelector("#formula-dialog-note").textContent = "空間兩點距離先分別計算 x、y、z 坐標差；每組差值都要加括號後平方。手機可左右滑動查看完整公式。";
+  }
   if (unitId === "M3-2-1") {
     document.querySelector("#formula-source-title").textContent = "課本第 53～57 頁";
     document.querySelector("#formula-dialog-title").textContent = "指數律、零指數、負指數與分數指數";
     document.querySelector("#formula-dialog-note").textContent = "先辨識底數與指數，再對照課本的相乘、乘方、零次、負次方與分數指數規則。第 56 頁分數指數定義以 a＞0、n 為正整數、m 為整數為前提。";
+  }
+  if (unitId === "M3-2-2") {
+    document.querySelector("#formula-source-title").textContent = "課本第 65～72 頁";
+    document.querySelector("#formula-dialog-title").textContent = "指數函數圖形、平移與應用";
+    document.querySelector("#formula-dialog-note").textContent = "對照課本定義、圖形性質和各類題公式。作圖題須另畫完整曲線並請教師核對。";
+  }
+  if (unitId === "M3-2-3") {
+    document.querySelector("#formula-source-title").textContent = "課本第 76～85 頁";
+    document.querySelector("#formula-dialog-title").textContent = "對數定義、運算律與換底公式";
+    document.querySelector("#formula-dialog-note").textContent = "先核對底數與真數的條件，再依類題需要使用指數與對數互換、乘除律或換底。例題供查閱，闖關題只取課本類題。";
+  }
+  if (unitId === "M3-2-4") {
+    document.querySelector("#formula-source-title").textContent = "課本第 89～95 頁";
+    document.querySelector("#formula-dialog-title").textContent = "對數函數圖形、平移與應用";
+    document.querySelector("#formula-dialog-note").textContent = "先看定義域、底數與 (1,0)，再查遞增／遞減及平移。類題 1、2 的完整作圖需教師核對。";
   }
   const totalSteps = data.questions.reduce((sum, question) => sum + question.steps.length, 0);
   const totalQuestions = data.questions.length;
@@ -42,11 +62,14 @@
     stepLabel: $("#step-label"),
     stepFill: $("#step-fill"),
     sourceReference: $("#source-reference"),
+    textbookStem: $("#textbook-stem"),
+    textbookStemContent: $("#textbook-stem-content"),
     missionLabel: $("#mission-label"),
     taskTitle: $("#task-title"),
     unitEyebrow: $("#unit-eyebrow"),
     questionMath: $("#question-math"),
     questionVisual: $("#question-visual"),
+    valueTableInput: $("#value-table-input"),
     solutionTrail: $("#solution-trail"),
     solutionTrailTitle: $("#solution-trail-title"),
     solutionTrailNote: $("#solution-trail-note"),
@@ -133,6 +156,7 @@
     lastInteractionMode: null,
     answerPositionPlan: createBalancedPlan(totalSteps, 3),
     optionOrders: {},
+    valueBoards: {},
     reducedMotion: window.matchMedia("(prefers-reduced-motion: reduce)").matches
   });
 
@@ -161,6 +185,7 @@
     if (resetAnswerOrder || !next.optionOrders || typeof next.optionOrders !== "object" || Array.isArray(next.optionOrders)) {
       next.optionOrders = {};
     }
+    if (!next.valueBoards || typeof next.valueBoards !== "object" || Array.isArray(next.valueBoards)) next.valueBoards = {};
     next.questionIndex = Math.max(0, Math.min(totalQuestions - 1, Number(next.questionIndex) || 0));
     next.stepIndex = Math.max(0, Math.min(data.questions[next.questionIndex].steps.length - 1, Number(next.stepIndex) || 0));
     next.xp = Math.max(0, Math.min(maxXp, Number(next.xp) || 0));
@@ -396,6 +421,7 @@
   }
 
   function orderedOptions(question, step) {
+    if (step.type === "value-table") return [];
     const key = `${question.id}:${view.stepIndex}`;
     const savedOrder = state.optionOrders[key];
     if (Array.isArray(savedOrder) && savedOrder.length === step.options.length) {
@@ -418,6 +444,59 @@
       <span class="option-key">${String.fromCharCode(65 + index)}</span>
       <span class="option-content">${item.html}</span>
     </label>`;
+  }
+
+  let selectedValue = null;
+  let pointerDrag = null;
+  let suppressValueSlotClick = false;
+  function valueBoard(step) {
+    const boards = isPracticeMode() || teacherPreview ? (view.valueBoards ||= {}) : state.valueBoards;
+    let board = boards[step.id];
+    const valid = board && Array.isArray(board.order) && Array.isArray(board.placements)
+      && board.order.length === step.values.length && board.placements.length === step.values.length
+      && [...board.order].sort().join("|") === [...step.values].sort().join("|")
+      && board.placements.every((value) => value === null || step.values.includes(value))
+      && new Set(board.placements.filter(Boolean)).size === board.placements.filter(Boolean).length;
+    if (!valid) {
+      const order = [...step.values];
+      for (let index = order.length - 1; index > 0; index -= 1) {
+        const other = Math.floor(Math.random() * (index + 1));
+        [order[index], order[other]] = [order[other], order[index]];
+      }
+      if (order.every((value, index) => value === step.values[index])) order.push(order.shift());
+      board = { order, placements: step.values.map(() => null) };
+      boards[step.id] = board;
+    }
+    return board;
+  }
+
+  function tileMath(value) {
+    if (/^[A-Z]{2}$/.test(value)) return `<span class="edge-token">${value}</span>`;
+    const parts = value.split("/");
+    const body = parts.length === 2 ? `<mfrac><mn>${parts[0]}</mn><mn>${parts[1]}</mn></mfrac>` : `<mn>${value}</mn>`;
+    return `<math xmlns="http://www.w3.org/1998/Math/MathML" aria-label="${value}"><semantics>${body}<annotation encoding="text/plain">${value}</annotation></semantics></math>`;
+  }
+
+  function renderValueBoard(step, review) {
+    const placements = review ? step.values : valueBoard(step).placements;
+    const order = review ? [] : valueBoard(step).order;
+    els.valueTableInput.innerHTML = `<p aria-live="polite">${selectedValue ? `已選取 ${selectedValue}；請點對應欄位。` : (step.boardInstruction || "將上方五個數值方塊放入對應的 x 欄位。可拖放，也可先點方塊再點欄位；點已放入的方塊可取回。")}</p>
+      <div class="tile-bank" role="group" aria-label="${step.slotPrefix ? "待配對方塊" : "待放數值"}">${order.filter((value) => !placements.includes(value)).map((value) => `<button type="button" class="value-tile${selectedValue === value ? " is-selected" : ""}" data-value="${value}" aria-pressed="${selectedValue === value}">${tileMath(value)}</button>`).join("")}</div>
+      <div class="value-table-grid" style="--slot-count:${step.xValues.length}" role="group" aria-label="${step.slotPrefix ? "配對欄位" : "對應 x 值的空格"}">${step.xValues.map((x, index) => `<button type="button" class="value-slot${placements[index] ? " is-filled" : ""}" data-slot="${index}" aria-label="${step.slotPrefix || "x 等於 "}${x}，${placements[index] ? `目前為 ${placements[index]}，點選可取回` : "空格，點選放入已選方塊"}" ${review ? "disabled" : ""}><span>${step.slotPrefix || "x = "}${tileMath(x)}</span><strong>${placements[index] ? tileMath(placements[index]) : "放在這裡"}</strong></button>`).join("")}</div>`;
+  }
+
+  function placeValue(index) {
+    const board = valueBoard(currentStep());
+    if (selectedValue) {
+      board.placements = board.placements.map((value) => value === selectedValue ? null : value);
+      board.placements[index] = selectedValue;
+      selectedValue = null;
+    } else if (board.placements[index]) {
+      board.placements[index] = null;
+    } else return;
+    els.feedbackPanel.hidden = true;
+    renderValueBoard(currentStep(), false);
+    saveState();
   }
 
   function scrollTaskIntoView() {
@@ -613,7 +692,7 @@
     if (completedSteps === 0) return;
 
     question.steps.slice(0, completedSteps).forEach((step, index) => {
-      const correctOption = step.options.find((option) => option.correct);
+      const correctOption = step.options?.find((option) => option.correct);
       const article = document.createElement("article");
       article.className = "solution-trail-item";
       article.dataset.step = String(index + 1);
@@ -636,7 +715,7 @@
       resultLabel.textContent = teacherPreview ? "參考結果" : "通過結果";
       const result = document.createElement("div");
       result.className = "solution-trail-answer";
-      result.innerHTML = correctOption?.html || "已完成此步驟。";
+      result.innerHTML = correctOption?.html || step.completedHtml || "已完成此步驟。";
 
       article.append(heading, title, resultLabel, result);
       els.solutionTrailList.append(article);
@@ -669,14 +748,24 @@
     els.stepLabel.textContent = `第 ${view.stepIndex + 1} 步，共 ${question.steps.length} 步`;
     els.stepFill.style.width = `${((view.stepIndex + 1) / question.steps.length) * 100}%`;
     els.sourceReference.textContent = question.sourceReference;
-    els.missionLabel.textContent = step.mission;
+    els.textbookStem.hidden = !question.sourceStemHtml;
+    els.textbookStemContent.innerHTML = question.sourceStemHtml || "";
+    els.missionLabel.textContent = question.sourceStemHtml ? `本步任務｜${step.mission}` : step.mission;
     els.taskTitle.textContent = step.title;
-    els.questionMath.innerHTML = question.promptMath;
+    els.questionMath.innerHTML = question.sourceStemHtml ? "" : question.promptMath;
+    els.questionMath.hidden = Boolean(question.sourceStemHtml);
+    els.taskTitle.parentElement.classList.toggle("has-textbook-stem", Boolean(question.sourceStemHtml));
     const visualHtml = step.visualHtml || question.visualHtml || "";
     els.questionVisual.innerHTML = visualHtml;
     els.questionVisual.hidden = !visualHtml;
     renderSolutionTrail(question);
     els.answerOptions.innerHTML = options.map((item, index) => renderOption(item, index, review)).join("");
+    els.answerOptions.hidden = step.type === "value-table";
+    els.valueTableInput.hidden = step.type !== "value-table";
+    if (step.type === "value-table") {
+      selectedValue = null;
+      renderValueBoard(step, review);
+    }
     if (window.CoordinatePlot) window.CoordinatePlot.mount(els.questionVisual, step, options, review, data.questions, state.completedQuestionIds);
     els.xpText.textContent = teacherPreview ? "預覽不計分" : `${state.xp} / ${maxXp}`;
     els.xpFill.style.width = `${Math.min(100, (state.xp / maxXp) * 100)}%`;
@@ -743,13 +832,47 @@
   function handleSubmit(event) {
     event.preventDefault();
     if (isReviewMode()) return;
+    const step = currentStep();
+    if (step.type === "value-table") {
+      const board = valueBoard(step);
+      if (board.placements.some((value) => value === null)) {
+        showFeedback("neutral", "還有空格", `先把 ${step.values.length} 個方塊都放入欄位，再確認這一步。`);
+        return;
+      }
+      const wrongIndex = board.placements.findIndex((value, index) => value !== step.values[index]);
+      if (wrongIndex >= 0) {
+        const slot = els.valueTableInput.querySelector(`[data-slot="${wrongIndex}"]`);
+        slot.setAttribute("aria-invalid", "true");
+        slot.focus();
+        recordActivity("answer", { correct: false, errorTag: step.errorTag || "函數值表" });
+        if (!isPracticeMode() && !teacherPreview) state.mistakes.push({ contentVersion, questionId: currentQuestion().id, step: view.stepIndex + 1, errorTag: step.errorTag || "函數值表", at: new Date().toISOString() });
+        saveState();
+        const copiedPrevious = unitId === "M3-2-2" && view.questionIndex === 1 && board.placements.every((value, index) => value === data.questions[0].steps[0].values[index]);
+        showFeedback("error", step.slotPrefix ? "請再檢查配對" : "請再檢查值表", copiedPrevious ? "目前的排序與上一關相同。這一關的底數小於 1，從左到右數值應遞減；負指數先取倒數。請取回方塊重新排列。" : `${step.slotPrefix || "x = "}${step.xValues[wrongIndex]} 這格尚未正確；點該欄位取回方塊後，再試一次。`);
+        return;
+      }
+      recordActivity("answer", { correct: true });
+      els.valueTableInput.querySelectorAll("button").forEach((button) => { button.disabled = true; button.removeAttribute("aria-invalid"); });
+      showFeedback("success", step.slotPrefix ? "配對正確" : "值表正確", step.slotPrefix ? "配對已完成；請再說明各組直線為何歪斜。" : "請依值表在紙本或平板書寫區描點並畫曲線；實際作圖仍待教師核對。");
+      animateCombat(step.skill);
+      const answeredMode = view.mode, answeredQuestionIndex = view.questionIndex, answeredStepIndex = view.stepIndex;
+      window.setTimeout(() => {
+        if (view.mode !== answeredMode || view.questionIndex !== answeredQuestionIndex || view.stepIndex !== answeredStepIndex) return;
+        if (view.stepIndex < currentQuestion().steps.length - 1) {
+          view.stepIndex += 1;
+          if (isPracticeMode() || teacherPreview) view.hintLevel = 0;
+          else { state.stepIndex = view.stepIndex; state.hintLevel = 0; }
+          render(); scrollTaskIntoView();
+        } else completeQuestion();
+      }, state.reducedMotion ? 120 : 760);
+      return;
+    }
     const selected = new FormData(els.answerForm).get("answer");
     if (!selected) {
       showFeedback("neutral", "尚未選擇", "先選一個判斷，再確認這一步。");
       return;
     }
 
-    const step = currentStep();
     const answer = step.options.find((item) => item.id === selected);
     const answeredMode = view.mode;
     const answeredQuestionIndex = view.questionIndex;
@@ -773,7 +896,7 @@
       saveState();
       els.focusValue.textContent = String(currentFocus());
       els.focusMeter.style.width = `${currentFocus()}%`;
-      showFeedback("error", `需要修正｜${answer.errorTag}`, answer.feedback);
+      showFeedback("error", `需要修正｜${errorLabels[answer.errorTag] || answer.errorTag}`, answer.feedback);
       animateEnemyCounterattack();
       return;
     }
@@ -899,7 +1022,22 @@
     QUADRANT_SIGN: "象限正負號",
     SUBSTITUTION_SIGN: "負數代入",
     FRACTION_OP: "分數運算",
-    RANGE_CHECK: "答案範圍檢查"
+    RANGE_CHECK: "答案範圍檢查",
+    POLAR_RADIUS: "向徑判讀",
+    ROTATION_DIRECTION: "旋轉方向",
+    POINT_LOCATION: "點的位置",
+    SIN_COS_SWAP: "正弦餘弦對調",
+    ANGLE_SUBSTITUTION: "角度代入",
+    VALUE_CHECK: "數值檢查",
+    COORD_SWAP: "坐標對調",
+    RADIUS_VALUE: "向徑數值",
+    POLAR_PAIR: "極坐標配對",
+    RADIUS_FORMULA: "向徑公式",
+    RADICAL_SCOPE: "根號範圍",
+    TRIG_RATIO: "三角比",
+    QUADRANT_ANGLE: "象限與角度",
+    REAL_PART: "實部",
+    IMAGINARY_PART: "虛部"
   };
 
   function updateStudentIdentity() {
@@ -1056,6 +1194,57 @@
   }
 
   els.answerForm.addEventListener("submit", handleSubmit);
+  els.valueTableInput.addEventListener("click", (event) => {
+    if (isReviewMode() || currentStep().type !== "value-table") return;
+    if (suppressValueSlotClick) return;
+    const tile = event.target.closest(".value-tile");
+    if (tile && event.detail === 0) {
+      selectedValue = selectedValue === tile.dataset.value ? null : tile.dataset.value;
+      renderValueBoard(currentStep(), false);
+      return;
+    }
+    const slot = event.target.closest(".value-slot");
+    if (slot) placeValue(Number(slot.dataset.slot));
+  });
+  els.valueTableInput.addEventListener("pointerdown", (event) => {
+    if (isReviewMode() || currentStep().type !== "value-table" || event.button !== 0) return;
+    const tile = event.target.closest(".value-tile");
+    if (!tile) return;
+    pointerDrag = { value: tile.dataset.value, x: event.clientX, y: event.clientY, moved: false, ghost: null };
+  });
+  window.addEventListener("pointermove", (event) => {
+    if (!pointerDrag) return;
+    const drag = pointerDrag;
+    if (!drag.moved && Math.hypot(event.clientX - drag.x, event.clientY - drag.y) < 7) return;
+    if (!drag.moved) {
+      drag.moved = true;
+      drag.ghost = document.createElement("div");
+      drag.ghost.className = "value-drag-ghost";
+      drag.ghost.innerHTML = tileMath(drag.value);
+      document.body.append(drag.ghost);
+    }
+    drag.ghost.style.left = `${event.clientX}px`;
+    drag.ghost.style.top = `${event.clientY}px`;
+    event.preventDefault();
+  });
+  window.addEventListener("pointerup", (event) => {
+    if (!pointerDrag) return;
+    const drag = pointerDrag;
+    pointerDrag = null;
+    drag.ghost?.remove();
+    const slot = drag.moved ? document.elementFromPoint(event.clientX, event.clientY)?.closest(".value-slot") : null;
+    selectedValue = drag.value;
+    if (slot && els.valueTableInput.contains(slot)) {
+      suppressValueSlotClick = true;
+      placeValue(Number(slot.dataset.slot));
+      window.setTimeout(() => { suppressValueSlotClick = false; }, 0);
+    }
+    else renderValueBoard(currentStep(), false);
+  });
+  window.addEventListener("pointercancel", () => {
+    pointerDrag?.ghost?.remove();
+    pointerDrag = null;
+  });
   els.hintButton.addEventListener("click", () => {
     if (isReviewMode()) return;
     const hintLevel = currentHintLevel();
@@ -1146,3 +1335,5 @@
   render();
   initializeStudentProfiles();
 })();
+
+
